@@ -1008,6 +1008,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
 
     LOG_PRINT(LOG_DEBUG, "Got the File!");
     evhtp_headers_add_header(req->headers_out, evhtp_header_new("Server", settings.server_name, 0, 1));
+    evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/jpeg", 0, 0));
 
     zimg_headers_add(req, settings.headers);
     evhtp_send_reply(req, EVHTP_RES_OK);

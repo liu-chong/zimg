@@ -39,7 +39,6 @@ typedef struct {
     int partno;
     int succno;
     int check_name;
-    char file_type[32];
 } mp_arg_t;
 
 int zimg_etag_set(evhtp_request_t *request, char *buff, size_t len);
@@ -55,9 +54,6 @@ void post_request_cb(evhtp_request_t *req, void *arg);
 void get_request_cb(evhtp_request_t *req, void *arg);
 void admin_request_cb(evhtp_request_t *req, void *arg);
 void info_request_cb(evhtp_request_t *req, void *arg);
-const char *get_filename_ext(const char *filename);
-const char *get_filename(const char *buff);
-const void setContentType(const char *filename_ext, evhtp_request_t *req);
 
 static const char * post_error_list[] = {
     "Internal error.",
@@ -425,7 +421,6 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
                     mp_arg->check_name = -1;
                 } else {
                     LOG_PRINT(LOG_DEBUG, "fileType[%s]", fileType);
-                    snprintf(mp_arg->file_type, 32, fileType);
                     if (is_img(fileType) != 1) {
                         LOG_PRINT(LOG_DEBUG, "fileType[%s] is Not Supported!", fileType);
                         mp_arg->check_name = -1;
@@ -827,7 +822,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
         }
     }
 
-    const char *uri, *filename_ext = NULL, *filename;
+    const char *uri;
     uri = req->uri->path->full;
 
     if (strlen(uri) == 1 && uri[0] == '/') {
@@ -865,36 +860,8 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
         goto done;
     }
 	
-	if(strstr(uri,"crossdomain.xml")){
-		int fd = -1;
-		struct stat st;
-		if((fd = open(settings.crossdomain_path, O_RDONLY)) == -1){    
-			LOG_PRINT(LOG_DEBUG, "Crossdomain Open Failed. Return Default Page.");
-			evbuffer_add_printf(req->buffer_out, "<html>\n<body></body>\n</html>\n");
-		}    
-		else{
-			if (fstat(fd, &st) < 0){    
-				LOG_PRINT(LOG_DEBUG, "Crossdomain Length fstat Failed. Return Default Page.");
-				evbuffer_add_printf(req->buffer_out, "<html>\n<body></body>\n</html>\n");
-			}    
-			else{
-				evbuffer_add_file(req->buffer_out, fd, 0, st.st_size);
-			}    
-		}    
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Server", settings.server_name, 0, 1)); 
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "text/xml", 0, 0)); 
-		evhtp_send_reply(req, EVHTP_RES_OK);
-		LOG_PRINT(LOG_DEBUG, "============get_request_cb() DONE!===============");
-		LOG_PRINT(LOG_INFO, "%s succ root page", address);
-		goto done;																				    
-	}
 	
     LOG_PRINT(LOG_DEBUG, "Got a GET request for <%s>",  uri);
-    if (strstr(uri, ".") != NULL) {
-		filename_ext = get_filename_ext(uri);
-		filename = get_filename(uri);
-		uri = filename;
-    }
     /* Don't allow any ".."s in the path, to avoid exposing stuff outside
      * of the docroot.  This test is both overzealous and underzealous:
      * it forbids aceptable paths like "/this/one..here", but it doesn't
@@ -1041,14 +1008,6 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
 
     LOG_PRINT(LOG_DEBUG, "Got the File!");
     evhtp_headers_add_header(req->headers_out, evhtp_header_new("Server", settings.server_name, 0, 1));
-
-//  has ext
-    if (filename_ext != NULL) {
-    	setContentType(filename_ext, req);
-	} else {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/jpeg", 0, 0));
-	}
-
 
     zimg_headers_add(req, settings.headers);
     evhtp_send_reply(req, EVHTP_RES_OK);
@@ -1335,43 +1294,4 @@ err:
 
 done:
     return;
-}
-
-const char *get_filename_ext(const char *filename) {
-	const char *dot = strrchr(filename, '.');
-	if (!dot || dot == filename)
-		return NULL;
-	return dot + 1;
-}
-
-const char *get_filename(const char *filename) {
-	const char *dot = strrchr(filename, '.');
-	int length = dot - filename;
-	char *subbuff = malloc(length * sizeof(char));
-
-	memcpy(subbuff, &filename[0], length);
-	subbuff[length] = '\0';
-	return subbuff;
-}
-
-const void setContentType(const char *filename_ext, evhtp_request_t *req) {
-	if(strcmp("jpeg", filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/jpeg", 0, 0));
-	} else if(strcmp("jpg",  filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/jpeg", 0, 0));
-	} else if(strcmp("png",  filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/png", 0, 0));
-	} else if(strcmp("gif",  filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/gif", 0, 0));
-	} else if(strcmp("webp", filename_ext) == 0) {
-
-	} else if(strcmp("txt",  filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "text/plain", 0, 0));
-	} else if(strcmp("rar",   filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "application/x-rar-compressed", 0, 0));
-	} else if(strcmp("zip",   filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "application/zip", 0, 0));
-	} else if(strcmp("torrent",   filename_ext) == 0) {
-		evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "application/octet-stream", 0, 0));
-	}
 }

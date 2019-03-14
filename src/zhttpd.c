@@ -465,7 +465,7 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
                            );
     } else {
         mp_arg->succno++;
-        evbuffer_add_printf(mp_arg->req->buffer_out, "{\"ret\":true,\"info\":{\"md5\":\"%s.%s\",\"size\":%d}}", md5sum, "jpeg", length);
+        evbuffer_add_printf(mp_arg->req->buffer_out, "{\"ret\":true,\"info\":{\"md5\":\"%s.%s\",\"size\":%d}}", md5sum, "jpg", length);
     }
     return 0;
 }
